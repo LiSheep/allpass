@@ -1,0 +1,15 @@
+{
+  "listen":{
+    "address": "127.0.0.1:8080"
+  },
+  "DB": {
+    "host": "127.0.0.1:27017",
+    "name": "allpass",
+    "user": "allpass_user",
+    "pass": "password"
+  },
+  "pem": {
+    "pub_key_path": "./keys/app.rsa.pub",
+    "prv_key_path": "./keys/app.rsa"
+  }
+}

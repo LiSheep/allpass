@@ -11,3 +11,4 @@ vi config.json
 ./allpass config.json
 ```
 
+Sample: https://allpass.tenchlee.com/

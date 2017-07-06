@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link href="/plugin/semantic/semantic.min.css" rel="stylesheet" type="text/css">
+    <style type="text/css">
+    body {
+        background-color:#DADADA;
+    }
+    body > .grid {
+        height:100%;
+    }
+    .image {
+        margin-top:-100px;
+    }
+    .column {
+        max-width:450px;
+    }
+    </style>
+    <script src="/js/jquery-3.1.1.min.js"></script>
+    <script src="/plugin/semantic/semantic.min.js"></script>
+    <script src="/js/tools.js"></script>
+    <script>
+            function postSuccess(data) {
+                if (data.success) {
+                    window.localStorage.setItem("salt", $("#password").val());
+                    window.localStorage.setItem("token", data.info);
+                    self.location = "/password";
+                } else {
+                    $("#errorInfo").html(data.info);
+                }
+            }
+            function postError(_, status) {
+                console.log("error", status);
+            }
+            $(document).ready(function () {
+                $("#subForm").click(function() {
+                    $.ajax({
+                        type: "post",
+                        dataType: "json",
+                        url: "/user/login",
+                        data: $("form").serialize(),
+                        success: postSuccess,
+                        error: postError
+                    })
+                });
+            });
+        </script>
+    <title>login</title>
+</head>
+<body>
+    <div class="ui middle aligned center aligned grid">
+        <div class="column">
+            <h2 class="ui teal image header">
+                <img src="assets/images/logo.png" class="image">
+                <div class="content">Login to your account</div></h2>
+            <form class="ui large form" action="/usr/login" method="post">
+                <div class="ui stacked segment">
+                    <div class="field">
+                        <div class="ui left icon input">
+                            <i class="user icon"></i>
+                            <input id="name" name="name" type="text" placeholder="name"></div>
+                    </div>
+                    <div class="field">
+                        <div class="ui left icon input">
+                            <i class="lock icon"></i>
+                            <input id="password" name="password" type="password" placeholder="password"></div>
+                    </div>
+                    <div class="ui fluid large teal submit button" id="subForm">Login</div></div>
+                <div id="errorInfo" class="ui error message"></div>
+            </form>
+            <div class="ui message">New to us?
+                <a href="/user/register">Sign Up</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

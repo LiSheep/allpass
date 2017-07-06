@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style type="text/css">
+            .ui.form {
+                padding: 1em;
+            }
+            #wecHeader {
+                padding-right: 1em;
+            }
+        </style>
+        <link href="/css/transition.css" rel="stylesheet" type="text/css">
+        <link href="/plugin/semantic/semantic.min.css" rel="stylesheet" type="text/css">
+        <!--<link href="https://unpkg.com/animate.css@3.5.1/animate.min.css" rel="stylesheet" type="text/css">-->
+
+        <script src="/js/jquery-3.1.1.min.js"></script>
+        <script src="/js/vue.js"></script>
+        <script src="/js/aes.js"></script>
+        <script src="/js/scrypt.js"></script>
+        <script src="/js/password.js"></script>
+        <script src="/plugin/semantic/semantic.min.js"></script>
+        <script src="/js/generate_pass.js"></script>
+        <script>
+            var dataCache = [];
+            var token = "";
+            $(document).ready(function () {
+                token = window.localStorage.getItem("token");
+                if (token == undefined || token == null || token.len == 0) {
+                    self.location = "/user/login";
+                    return;
+                }
+                var sec = window.localStorage.getItem("secret");
+                if (sec == undefined || sec == null || sec.len == 0) {
+                    sec = ""
+                }
+                $("#secret").val(sec);
+                vm = new Vue({
+                    el: "#passList",
+                    data: {
+                        pass: null
+                    },
+                    methods: {
+                        showSecret: showSecret,
+                        deletePass: deletePass,
+                        showUpdatePassModal: showUpdatePassModal
+                    }
+                });
+
+                $("#addPassword").modal({allowMultiple: true});
+                $("#warn_addPassword").modal({allowMultiple: true});
+
+                $.ajax({
+                    type: "get",
+                    dataType: "json",
+                    url: "/password/listAPI",
+                    headers: {
+                        Authentication: token
+                    },
+                    success: function(data) {
+                        getPasswordSuccess(vm, data);
+                        for (var i = 0; i < data.length; i++) {
+                            dataCache[i] = {
+                                id: data[i].id,
+                                Site: data[i].Site,
+                                Username: data[i].Username,
+                                me: data[i]
+                            };
+                        }
+                        $(".ui.search").search({
+                            source: dataCache,
+                            searchFields: ['Site'],
+                            fields: {
+                                title: 'Site'
+                            }
+                        });
+                    }
+                });
+
+                $(".ui.search").on('change', function() {
+                    var results = $('.ui.search').search('get results');
+                    var data = [];
+                    for (var i = 0; i < results.length; i++) {
+                        if (results[i].id) {
+                            data[i] = dataCache[results[i].id].me;
+                        }
+                    }
+                    vm.pass = data;
+                });
+
+                $("#addPassBtn").click(function() {
+                    var secret = window.localStorage.getItem("secret");
+                    var salt = window.localStorage.getItem("salt");
+                    if (secret == null || secret.length == 0) {
+                        console.log("secret is null")
+                        $("#warn_addPassword").modal('show');
+                        return;
+                    }
+                    if (salt == null || salt.length == 0) {
+                        self.location = "/user/login"
+                        return;
+                    }
+                    var password = $("#password").val();
+                    encode(password, secret, salt,
+                    function(res) {
+                        $.ajax({
+                            type: "post",
+                            dataType: "json",
+                            url: "/password/add",
+                            headers: {
+                                Authentication: token
+                            },
+                            data: {
+                                site: $("#site").val(),
+                                username: $("#username").val(),
+                                password: res
+                            },
+                            success: postSuccessFlush
+                        });
+                        $("#site").val("");
+                        $("#username").val("");
+                        $("#password").val("");
+                    });
+                });
+                $("#updatePassBtn").click(function() {
+                    var secret = window.localStorage.getItem("secret");
+                    var salt = window.localStorage.getItem("salt");
+                    if (secret == "" || secret == null || secret.length == 0) {
+                        $("#warn_addPassword").modal('show');
+                        return;
+                    }
+                    var password = $("#u_password").val()
+                    encode(password, secret, salt,
+                    function(res) {
+                        $.ajax({
+                            type: "post",
+                            dataType: "json",
+                            url: "/password/update",
+                            headers: {
+                                Authentication: token
+                            },
+                            data: {
+                                id: $("#u_passId").val(),
+                                site: $("#u_site").val(),
+                                username: $("#u_username").val(),
+                                secret: res
+                            },
+                            success: postSuccessFlush
+                        });
+                        $("#u_passId").val("");
+                        $("#u_site").val("");
+                        $("#u_username").val("");
+                        $("#u_password").val("");
+                    });
+                });
+            });
+            function postSuccessFlush(data) {
+                if (data.success) {
+                    flush_password(vm)
+                }
+            }
+            function deletePass(s) {
+                $.ajax({
+                    type: "post",
+                    dataType: "json",
+                    url: "/password/remove",
+                    headers: {
+                        Authentication: token
+                    },
+                    data: {
+                        site: s.Site
+                    },
+                    success: function(res) {
+                        if (res.success) {
+                            var i = vm.pass.indexOf(s);
+                            vm.pass.splice(i, 1);
+                        }
+                    }
+                });
+            }
+
+            function showUpdatePassModal(s) {
+                var secret = window.localStorage.getItem("secret");
+                var salt = window.localStorage.getItem("salt");
+                if (secret == "" || secret == null || secret.length == 0) {
+                    $("#warn_addPassword").modal('show');
+                    return;
+                }
+                $("#updatePassword").modal('show');
+                $("#u_passId").val(s.Id);
+                $("#u_site").val(s.Site);
+                $("#u_username").val(s.Username);
+                decode(s.Secret, secret, salt, function(res) {
+                    $("#u_password").val(res);
+                });
+            }
+            function showSetSecretModal() {
+                $("#setSecret").modal('show')
+            }
+            function logout() {
+                window.localStorage.setItem("token", "");
+                self.location = "/user/logout";
+            }
+
+        </script>
+        <title>password list</title>
+    </head>
+    <body>
+        <div class="ui inverted segment">
+            <div class="ui inverted secondary pointing menu">
+                <a class="item" href="/">Home </a>
+                <a class="active item" href="/password">My Password </a>
+                <div class="right item">
+                    <div class="content">
+                        <div id="wecHeader" class="header">Welcome: <b id="account">litc</b></div>
+                    </div>
+                    <div class="ui primary button" onclick="logout()">Logout</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ui container">
+            <div class="grey ui buttons">
+                <button class="ui left attached button" onclick="$('#addPassword').modal('show')">Add Password</button>
+                <button class="right attached ui button" onclick="showSetSecretModal()">Set Secret</button>
+            </div>
+            <div class="ui search">
+                <div class="ui icon input">
+                    <input id="searchPass" class="prompt" placeholder="Search Password..."
+                           type="text" autocomplete="off" value="">
+                    <i class="search icon"></i>
+                </div>
+                <div class="results"></div>
+            </div>
+        <table id="passList" class="ui fixed  table">
+            <thead>
+                <tr>
+                    <th class="four wide">site</th>
+                    <th class="four wide">username</th>
+                    <th class="eight wide">password</th>
+                    <th class="right aligned four wide">Operation</th>
+                </tr>
+            </thead>
+            <transition-group name="table-row" tag="tbody">
+            <tr v-for="d in pass" :key="d.id">
+                <td>{{d.Site}}</td>
+                <td>{{d.Username}}</td>
+                <td class="selectable">
+                    <transition name="fade" mode="out-in">
+                        <a :key="d.decoded" @click="showSecret(d)" style="cursor:pointer">
+                            {{ d.decoded ? d.Secret: 'show password' }}
+                        </a>
+                    </transition>
+                </td>
+                <td class="right aligned">
+                    <button class="negative ui button" @click="deletePass(d)">Delete</button>
+                    <button class="ui button" @click="showUpdatePassModal(d)">Update</button>
+            </tr>
+            </transition-group>
+        </table>
+        </div>
+        <!-- set secret modal -->
+        <div class="ui modal" id="setSecret">
+            <div class="header">Please Set Your Secret</div>
+            <div class="ui form warning ">
+                <div class="ui actions input field column five wide column ">
+                    <input placeholder="" id="secret" type="password">
+                    <div id="setSecretBtn" class="ui positive right labeled icon button">
+                        Set
+                        <i class="checkmark icon"></i>
+                    </div>
+                </div>
+                <div class="ui warning message">
+                    <div class="header">Secret too short may not safe!</div>
+                </div>
+            </div>
+            <script>
+                $("#setSecretBtn").click(function () {
+                    var oldSecret = window.localStorage.getItem("secret");
+                    var newSecret = $("#secret").val();
+                    var salt = window.localStorage.getItem("salt");
+                    console.log(oldSecret)
+                    if (salt == null || salt.length == 0) {
+                        console.log("salt empty");
+                        return;
+                    }
+                    if (oldSecret == newSecret) {
+                        return;
+                    }
+                    updateAllPassword(oldSecret, salt, newSecret, salt, function(res) {
+                        if (res.success) {
+                            self.location = "/password/list";
+                            window.localStorage.setItem("secret", newSecret);
+                        }
+                    });
+                });
+            </script>
+        </div>
+
+        <div id="addPassword" class="ui large modal">
+            <div class="header">
+                Add Password
+            </div>
+            <div class="ui form">
+                <form class="ui form">
+                    <h4 class="ui dividing header">Add A Password</h4>
+                    <div class="field">
+                        <label>Site</label>
+                        <input type="text" id="site">
+                    </div>
+                    <div class="field">
+                        <label>Username</label>
+                        <input type="text" id="username">
+                    </div>
+                    <div class="field">
+                        <label>Password</label>
+                        <input type="text" id="password">
+                    </div>
+                    <div>
+                        <div class="ui button" id="generate_pass" onclick="generate_pass()">
+                            generate pasword
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <script>
+                function generate_pass() {
+                    var ps = Password.generate([8,20], {special: 5, nums: 4, uppers: 3});
+                    $("#password").val(ps);
+                }
+            </script>
+            <div class="actions">
+                <div class="ui positive right labeled icon button" id="addPassBtn">
+                    OK
+                    <i class="checkmark icon"></i>
+                </div>
+                <div class="ui black cancel button">
+                    Cancel
+                </div>
+            </div>
+        </div>
+
+        <div id="updatePassword" class="ui large modal">
+            <div class="header">
+                Update Password
+            </div>
+            <div class="ui form">
+                <form class="ui form">
+                    <input type="hidden" id="u_passId" value="">
+                    <div class="field">
+                        <label>Site</label>
+                        <input type="text" id="u_site">
+                    </div>
+                    <div class="username">
+                        <label>Username</label>
+                        <input type="text" id="u_username">
+                    </div>
+                    <div class="field">
+                        <label>Password</label>
+                        <input type="text" id="u_password">
+                    </div>
+                </form>
+            </div>
+            <div class="actions">
+                <div class="ui positive right labeled icon button" id="updatePassBtn">
+                    OK
+                    <i class="checkmark icon"></i>
+                </div>
+                <div class="ui black cancel button">
+                    Cancel
+                </div>
+            </div>
+        </div>
+
+        <div id="warn_addPassword" class="ui small modal">
+            <div class="ui two cloumn">
+                <div class="ui error ignored message">You Need Set Secret</div>
+                <div class="ui button middle" onclick="showSetSecretModal()">Go To Set Secret</div>
+            </div>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,14 @@
+.fade-enter-active, .fade-leave-active {
+    transition: opacity .5s
+}
+.fade-enter, .fade-leave-active {
+    opacity: 0
+}
+
+
+.list-leave-active {
+  transition: all .5s;
+}
+.list-leave {
+    transform: translateY(30px);
+}
